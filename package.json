@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Attach to a node repl using Hyperswarm",
   "main": "index.js",
+  "bin": {
+    "repl-swarm": "./bin.js"
+  },
   "dependencies": {
     "@hyperswarm/dht": "^5.0.17",
     "sodium-universal": "^3.1.0"
