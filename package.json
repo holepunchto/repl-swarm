@@ -13,12 +13,12 @@
   "devDependencies": {},
   "repository": {
     "type": "git",
-    "url": "https://github.com/mafintosh/repl-swarm.git"
+    "url": "https://github.com/holepunchto/repl-swarm.git"
   },
   "author": "Mathias Buus (@mafintosh)",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/mafintosh/repl-swarm/issues"
+    "url": "https://github.com/holepunchto/repl-swarm/issues"
   },
-  "homepage": "https://github.com/mafintosh/repl-swarm"
+  "homepage": "https://github.com/holepunchto/repl-swarm"
 }
