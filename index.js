@@ -1,4 +1,4 @@
-const DHT = require('@hyperswarm/dht')
+const DHT = require('hyperdht')
 const sodium = require('sodium-universal')
 const repl = require('repl')
 const os = require('os')
