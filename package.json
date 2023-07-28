@@ -1,6 +1,6 @@
 {
   "name": "repl-swarm",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "description": "Attach to a node repl using Hyperswarm",
   "main": "index.js",
   "bin": {
