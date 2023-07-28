@@ -54,11 +54,14 @@ module.exports = function replSwarm ({ seed, ...context } = {}) {
 
   server.listen(keyPair)
 
-  console.error('[repl-swarm] Repl attached. To connect to it run:\n             repl-swarm ' + seed.toString('hex'))
+  const hexSeed = seed.toString('hex')
+  console.error('[repl-swarm] Repl attached. To connect to it run:\n             repl-swarm ' + hexSeed)
 
   function firewall (remotePublicKey) {
     return !remotePublicKey.equals(keyPair.publicKey)
   }
+
+  return hexSeed
 }
 
 module.exports.attach = function (seed) {
