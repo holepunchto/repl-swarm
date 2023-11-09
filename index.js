@@ -1,10 +1,14 @@
 const DHT = require('hyperdht')
 const sodium = require('sodium-universal')
+const crypto = require('hypercore-crypto')
 const repl = require('repl')
 const os = require('os')
 const path = require('path')
 const net = require('net')
 const process = require('process')
+const inspector = require('inspector')
+
+const DEVTOOLS_PORT = +process.env.DEVTOOLS_PORT
 
 module.exports = function replSwarm ({ seed, devtools, ...context } = {}) {
   const node = new DHT({ ephemeral: true })
@@ -12,30 +16,87 @@ module.exports = function replSwarm ({ seed, devtools, ...context } = {}) {
   if (!seed) seed = process.env.REPL_SWARM || randomBytes(32)
   if (typeof seed === 'string') seed = Buffer.from(seed, 'hex')
 
-  const keyPair = DHT.keyPair(seed)
+  const keyPairs = createKeyPairs(seed)
 
-  const server = node.createServer({ firewall, reusableSocket: true }, function (socket) {
-    if (devtools) {
-      listenDevtools(socket, context)
-    } else {
-      listenRepl(seed, keyPair, socket, context)
-    }
-  })
-  server.listen(keyPair)
+  const replServer = node.createServer({
+    firewall: firewall(keyPairs.repl),
+    reusableSocket: true
+  }, handleReplConnection)
+  const devtoolsServer = node.createServer({
+    firewall: firewall(keyPairs.devtools),
+    reusableSocket: true
+  }, handleDevtoolsConnection)
+
+  replServer.listen(keyPairs.repl)
+  devtoolsServer.listen(keyPairs.devtools)
 
   const hexSeed = seed.toString('hex')
-  if (devtools) {
-    console.error('[repl-swarm] Listening for devtools. To connect to it run:\n             repl-swarm ' + hexSeed + ' --devtools\n')
-    console.error('             Then open Chrome devtools and connect to the Node process')
-  } else {
-    console.error('[repl-swarm] Repl attached. To connect to it run:\n             repl-swarm ' + hexSeed)
-  }
+  console.error('[repl-swarm] Repl attached. To connect to it run:\n             repl-swarm ' + hexSeed)
 
-  function firewall (remotePublicKey) {
-    return !remotePublicKey.equals(keyPair.publicKey)
+  function firewall (keyPair) {
+    return (remotePublicKey) => !remotePublicKey.equals(keyPair.publicKey)
   }
 
   return hexSeed
+
+  function handleReplConnection (socket) {
+    socket.setTimeout(30000)
+    socket.setKeepAlive(20000)
+    socket.on('end', () => socket.end())
+    socket.on('error', (err) => { console.log('err:', err); socket.destroy() })
+    socket.on('close', function () {
+      console.error('[repl-swarm] Session closed')
+    })
+
+    const tmp = path.join(os.tmpdir(), 'repl-swarm-' + keyPairs.repl.publicKey.toString('hex'))
+    const prompt = '[' + seed.subarray(0, 4).toString('hex') + ']> '
+
+    const r = repl.start({
+      useColors: true,
+      prompt,
+      input: socket,
+      output: socket,
+      terminal: true,
+      preview: false
+    })
+    r.context.enableDevtools = (pid = process.pid) => {
+      global.context = context
+      if (pid !== process.pid) {
+        process.kill(pid, 'SIGUSR1')
+      } else {
+        inspector.open(DEVTOOLS_PORT || 9229, '127.0.0.1')
+      }
+      r.output.write('[repl-swarm] Listening for devtools. To connect to it run:\n             repl-swarm ' + hexSeed + ' --devtools\n')
+      r.output.write('             Then open Chrome Devtools and connect to the Node process\n')
+    }
+
+    r.on('exit', function () {
+      socket.end()
+    })
+
+    r.on('error', function () {
+      socket.destroy()
+    })
+
+    r.setupHistory(tmp, () => {})
+
+    for (const key of Object.keys(context)) {
+      r.context[key] = context[key]
+    }
+  }
+
+  function handleDevtoolsConnection (socket) {
+    socket.setTimeout(30000)
+    socket.setKeepAlive(20000)
+
+    const tcp = net.connect(DEVTOOLS_PORT || 9229, '127.0.0.1', () => {
+      socket.pipe(tcp).pipe(socket)
+      socket.on('close', () => tcp.destroy())
+      tcp.on('close', () => socket.destroy())
+      socket.on('error', noop)
+      tcp.on('error', noop)
+    })
+  }
 }
 
 module.exports.attach = function (seed, { devtools = false } = {}) {
@@ -44,51 +105,18 @@ module.exports.attach = function (seed, { devtools = false } = {}) {
   if (!seed) throw new Error('Seed is required')
 
   const node = new DHT({ ephemeral: true })
-  const keyPair = DHT.keyPair(seed)
+
+  const keyPairs = createKeyPairs(seed)
 
   if (devtools) {
-    attachDevtools(node, keyPair)
+    attachDevtools(node, keyPairs.devtools)
   } else {
-    attachRepl(node, keyPair)
-  }
-}
-
-function listenRepl (seed, keyPair, socket, context) {
-  socket.on('end', () => socket.end())
-  socket.on('error', (err) => { console.log('err:', err); socket.destroy() })
-  socket.on('close', function () {
-    console.error('[repl-swarm] Session closed')
-  })
-
-  const tmp = path.join(os.tmpdir(), 'repl-swarm-' + keyPair.publicKey.toString('hex'))
-  const prompt = '[' + seed.subarray(0, 4).toString('hex') + ']> '
-
-  const r = repl.start({
-    useColors: true,
-    prompt,
-    input: socket,
-    output: socket,
-    terminal: true,
-    preview: false
-  })
-
-  r.on('exit', function () {
-    socket.end()
-  })
-
-  r.on('error', function () {
-    socket.destroy()
-  })
-
-  r.setupHistory(tmp, () => {})
-
-  for (const key of Object.keys(context)) {
-    r.context[key] = context[key]
+    attachRepl(node, keyPairs.repl)
   }
 }
 
 function attachRepl (node, keyPair) {
-  const socket = node.connect(keyPair.publicKey, { keyPair })
+  const socket = node.connect(keyPair.publicKey, { reusableSocket: true, keyPair })
   socket.setTimeout(30000)
   socket.setKeepAlive(20000)
 
@@ -113,29 +141,9 @@ function attachRepl (node, keyPair) {
   })
 }
 
-function listenDevtools (socket, context) {
-  global.context = context
-  process.kill(process.pid, 'SIGUSR1')
-
-  const tcp = net.connect(9229, '127.0.0.1', onconnect)
-
-  function onconnect () {
-    socket.pipe(tcp).pipe(socket)
-    socket.on('close', () => tcp.destroy())
-    tcp.on('close', () => socket.destroy())
-    socket.on('error', noop)
-    tcp.on('error', noop)
-  }
-}
-
 function attachDevtools (node, keyPair) {
-  const server = net.createServer(onconnection)
-
-  server.listen(9229)
-  console.log('Open devtools to connect...')
-
-  function onconnection (tcp) {
-    const socket = node.connect(keyPair.publicKey, { keyPair })
+  const server = net.createServer(tcp => {
+    const socket = node.connect(keyPair.publicKey, { reusableSocket: true, keyPair })
     socket.setTimeout(30000)
     socket.setKeepAlive(20000)
 
@@ -145,6 +153,22 @@ function attachDevtools (node, keyPair) {
     tcp.on('close', () => socket.destroy())
     socket.on('error', noop)
     tcp.on('error', noop)
+  })
+
+  server.listen(9229, '127.0.0.1')
+  server.on('listening', () => {
+    const addr = server.address()
+    console.log(`Devtools server listening on ${addr.address}:${addr.port}...`)
+  })
+}
+
+function createKeyPairs (seed) {
+  const replSeed = seed
+  const devtoolsSeed = crypto.hash(seed)
+
+  return {
+    repl: DHT.keyPair(replSeed),
+    devtools: DHT.keyPair(devtoolsSeed)
   }
 }
 
