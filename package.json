@@ -10,6 +10,20 @@
     "hyperdht": "^6.6.0",
     "sodium-universal": "^4.0.0"
   },
+  "imports": {
+    "repl": {
+      "bare": "bare-repl",
+      "default": "repl"
+    },
+    "os": {
+      "bare": "bare-os",
+      "default": "os"
+    },
+    "path": {
+      "bare": "bare-path",
+      "default": "path"
+    }
+  },
   "devDependencies": {},
   "repository": {
     "type": "git",
