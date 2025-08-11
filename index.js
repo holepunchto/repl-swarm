@@ -4,7 +4,7 @@ const repl = require('repl')
 const os = require('os')
 const path = require('path')
 
-module.exports = function replSwarm ({ seed, logSeed=true, ...context } = {}) {
+module.exports = function replSwarm ({ seed, logSeed = true, ...context } = {}) {
   const node = new DHT({ ephemeral: true })
 
   if (!seed) seed = process.env.REPL_SWARM || randomBytes(32)
