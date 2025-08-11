@@ -31,6 +31,16 @@ repl-swarm <key printed above>
 
 Then you'll have a full end-to-end encrypted node repl.
 
+## API
+
+#### `const seed = repl(opts)`
+
+`opts` include:
+- `seed`: the seed to use (if not set, it checks the `REPL_SWARM` environment variable. If that is not set either then it defaults to a random seed)
+- `logSeed`: whether to log the seed (default true).
+
+Any other opts are exposed over the repl (see Usage section).
+
 ## License
 
 MIT
