@@ -4,7 +4,7 @@ const repl = require('repl')
 const os = require('os')
 const path = require('path')
 
-module.exports = function replSwarm ({ seed, ...context } = {}) {
+module.exports = function replSwarm ({ seed, logSeed=true, ...context } = {}) {
   const node = new DHT({ ephemeral: true })
 
   if (!seed) seed = process.env.REPL_SWARM || randomBytes(32)
@@ -55,7 +55,7 @@ module.exports = function replSwarm ({ seed, ...context } = {}) {
   server.listen(keyPair)
 
   const hexSeed = seed.toString('hex')
-  console.error('[repl-swarm] Repl attached. To connect to it run:\n             repl-swarm ' + hexSeed)
+  if (logSeed) console.error('[repl-swarm] Repl attached. To connect to it run:\n             repl-swarm ' + hexSeed)
 
   function firewall (remotePublicKey) {
     return !remotePublicKey.equals(keyPair.publicKey)
