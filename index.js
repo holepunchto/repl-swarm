@@ -39,7 +39,7 @@ module.exports = function replSwarm ({ seed, logSeed = true, ...context } = {}) 
       socket.destroy()
     })
 
-    r.setupHistory(tmp, () => {})
+    if (r.setupHistory) r.setupHistory(tmp, () => {})
 
     for (const key of Object.keys(context)) {
       r.context[key] = context[key]
